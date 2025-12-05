@@ -95,11 +95,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "Материал загружается, ожидайте...\n"
                     
                 )
-                await query.message.reply_text(
-                    text, 
-                    parse_mode=ParseMode.HTML,
-                    disable_web_page_preview=True
-                )
+
+                with open("photo.jpg", "rb") as photo:
+                    await query.message.reply_photo(
+                        photo=photo,
+                        caption=text,
+                        parse_mode=ParseMode.HTML
+                    )
                 with open(FILE_PATH, "rb") as file:
                     await query.message.reply_document(
                         document=file,
