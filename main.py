@@ -4,21 +4,21 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from telegram.constants import ParseMode
 import os
 from dotenv import load_dotenv
+
 # Загружаем переменные из .env файла
 load_dotenv()
 
 # Настройка логирования
-# logging.basicConfig(
-#     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-#     level=logging.INFO
-# )
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
 # Конфигурация бота из переменных окружения
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 CHANNEL_LINK = os.getenv('CHANNEL_LINK')
 CHANNEL_USERNAME = os.getenv('CHANNEL_USERNAME')
 YANDEX_DISK_LINK = os.getenv('YANDEX_DISK_LINK')
-FILE_PATH = os.getenv('FILE_PATH', 'materials.pdf')
 PROCESSING_LINK = os.getenv("PROCESSING_LINK")
 POLITICS_LINK = os.getenv("POLITICS_LINK")
 
@@ -33,6 +33,11 @@ get_material_keyboard = InlineKeyboardMarkup([
 
 check_subscription_keyboard = InlineKeyboardMarkup([
     [InlineKeyboardButton("✅ Я подписался", callback_data="check_subscription")]
+])
+
+# Клавиатура для скачивания с Яндекс.Диска
+download_keyboard = InlineKeyboardMarkup([
+    [InlineKeyboardButton("📥 Скачать материал", url=YANDEX_DISK_LINK)]
 ])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -59,13 +64,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == "consent":
         text = (
-            
-            "📋 ИНСТРУКЦИЯ: как получить подарок\n\n"
-            "1️⃣ Перейдите в канал <a href='{channel_link}'>Энергия и стройность с Татьяной Ручкиной</a>:\n"
-            "и нажмите кнопку «Подписаться».\n"
-            "2️⃣ Вернитесь в этот чат-бот и нажмите «Забрать подарок 🎁».\n\n"
-            "💫 Сразу после этого вы мгновенно получите доступ к материалу\n"
-            "«Как пройти правильный чек-ап после 40».\n"
+            "📋 <b>ИНСТРУКЦИЯ ПО ПОЛУЧЕНИЮ ПОДАРКА</b>\n\n"
+            "▫️ <b>Шаг 1.</b> Подпишитесь на канал:\n"
+            "   👉 <a href='{channel_link}'>Энергия и стройность с Татьяной Ручкиной</a>\n\n"
+            "▫️ <b>Шаг 2.</b> Вернитесь в бот и нажмите кнопку:\n"
+            "   🎁 <i>«Забрать подарок»</i>\n\n"
+            "✨ <b>Результат:</b> Мгновенный доступ к материалу\n"
+            "   📌 «3 варианта ужинов для вечерней сытости и лёгкости после 40»\n"
         ).format(channel_link=CHANNEL_LINK)
         await query.message.reply_text(
             text, 
@@ -76,36 +81,40 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     elif query.data == "get_material":
         user_id = query.from_user.id
-        # await context.bot.send_photo(chat_id=user_id, photo=open("Pro.jpg","rb"))
-        print('---------------')
+        
         # Проверяем подписку на канал
         try:
             chat_member = await context.bot.get_chat_member(
                 chat_id=CHANNEL_USERNAME, 
                 user_id=user_id
             )
-            print(chat_member)
+            
             # Статусы, которые считаются подпиской
             valid_statuses = ["member", "administrator", "creator"]
             
             if chat_member.status in valid_statuses:
-                # Пользователь подписан - выдаем материал
+                # Пользователь подписан - выдаем ссылку на Яндекс.Диск
                 text = (
                     "🎉 Поздравляем! Вы получили доступ к подарку!\n\n"
-                    "Материал загружается, ожидайте...\n"
-                    
+                    "📚 «3 варианта ужинов для вечерней сытости и лёгкости после 40»\n\n"
+                    "⬇️ Нажмите кнопку ниже для мгновенного скачивания:"
                 )
-
-                with open("photo.jpg", "rb") as photo:
-                    await query.message.reply_photo(
-                        photo=photo,
-                        caption=text,
-                        parse_mode=ParseMode.HTML
+                
+                # Отправляем фото с поздравлением и кнопкой скачивания
+                try:
+                    await query.message.reply_text(
+                        text,
+                        reply_markup=download_keyboard,
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=True
                     )
-                with open(FILE_PATH, "rb") as file:
-                    await query.message.reply_document(
-                        document=file,
-                        caption="📁 Скачайте подарок\n"
+                except FileNotFoundError:
+                    # Если фото не найдено, отправляем текст с кнопкой
+                    await query.message.reply_text(
+                        text,
+                        reply_markup=download_keyboard,
+                        parse_mode=ParseMode.HTML,
+                        disable_web_page_preview=True
                     )
             else:
                 # Пользователь не подписан
@@ -121,7 +130,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 
         except Exception as e:
-            # Если бот не может проверить подписку (не добавлен в канал как администратор)
+            # Если бот не может проверить подписку
             logging.error(f"Ошибка проверки подписки: {e}")
             text = (
                 "⚠️ Не могу проверить подписку.\n\n"
@@ -144,19 +153,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=CHANNEL_USERNAME, 
                 user_id=user_id
             )
-            print(chat_member)
             
             valid_statuses = ["member", "administrator", "creator"]
             
             if chat_member.status in valid_statuses:
                 text = (
-                    "🎉 Отлично! Теперь вы подписаны на канал!\n\n"
-                    "📁 Скачайте материал по ссылке:\n"
-                    "<a href='{disk_link}'>Яндекс.Диск с материалами</a>\n\n"
-                    "Если возникли проблемы со скачиванием, напишите в поддержку."
-                ).format(disk_link=YANDEX_DISK_LINK)
+                    "✅ Отлично! Подписка подтверждена!\n\n"
+                    "🎉 Теперь вы можете получить ваш подарок!\n\n"
+                    "📚 «3 варианта ужинов для вечерней сытости и лёгкости после 40»\n\n"
+                    "⬇️ Нажмите кнопку ниже для скачивания:"
+                )
                 await query.message.reply_text(
-                    text, 
+                    text,
+                    reply_markup=download_keyboard,
                     parse_mode=ParseMode.HTML,
                     disable_web_page_preview=True
                 )
@@ -165,7 +174,6 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "❌ Вы все еще не подписаны на канал!\n\n"
                     "Пожалуйста, подпишитесь на канал <a href='{channel_link}'>Энергия и стройность с Татьяной Ручкиной</a> и нажмите кнопку ниже для проверки."
                 ).format(channel_link=CHANNEL_LINK)
-                # Для редактирования сообщения с кнопкой используем edit_message_text у query
                 await query.edit_message_text(
                     text,
                     reply_markup=check_subscription_keyboard,
@@ -189,6 +197,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     """Основная функция запуска бота"""
+    # Проверяем наличие токена
+    if not BOT_TOKEN:
+        logging.error("BOT_TOKEN не найден в переменных окружения!")
+        return
+    
     # Создаем приложение
     application = Application.builder().token(BOT_TOKEN).build()
     
